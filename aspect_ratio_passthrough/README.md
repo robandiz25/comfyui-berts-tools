@@ -10,12 +10,8 @@ a wired-in image instead of a preset dropdown.
 
 ## Install
 
-1. Copy this whole folder into your ComfyUI `custom_nodes` directory, so you
-   end up with:
-   `ComfyUI/custom_nodes/ComfyUI-AspectRatioPassthrough/`
-2. Restart ComfyUI.
-3. The node appears in the node search / right-click menu as
-   **Aspect Ratio Passthrough**, under the `utils/resolution` category.
+Part of [Bert's Tools](../README.md) — see the main README for install steps.
+The node appears as **Aspect Ratio Passthrough** under `utils/resolution`.
 
 No extra dependencies — it only uses Python's standard library `math`.
 

@@ -45,15 +45,8 @@ Output is always PNG.
 
 ## Installation
 
-Clone into your ComfyUI `custom_nodes` folder and restart ComfyUI:
-
-```
-cd ComfyUI/custom_nodes
-git clone https://github.com/robandiz25/comfyui-source-metadata.git
-```
-
-No extra dependencies — it only uses Pillow, numpy and torch, which ComfyUI already includes.
+Part of [Bert's Tools](../README.md) — see the main README for install steps.
 
 ## License
 
-MIT
+MIT — see [LICENSE](../LICENSE).

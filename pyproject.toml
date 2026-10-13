@@ -1,0 +1,14 @@
+[project]
+name = "comfyui-berts-tools"
+description = "Bert's Tools: Aspect Ratio Passthrough plus Source Metadata load/save nodes for ComfyUI."
+version = "1.0.0"
+license = { file = "LICENSE" }
+dependencies = []
+
+[project.urls]
+Repository = "https://github.com/robandiz25/comfyui-berts-tools"
+
+[tool.comfy]
+PublisherId = "robandiz25"
+DisplayName = "Bert's Tools"
+Icon = ""
