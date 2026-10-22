@@ -14,6 +14,15 @@ Drop an image in and get the **positive** and **negative** prompts it was made w
 | `source_metadata` | IMAGE_META | Wire into **Save Image (Source Metadata)** if you want to keep the original workflow |
 | `filename` | STRING | File name without extension |
 
+### Link prompts toggle
+
+The node has a **link prompts** toggle:
+
+- **Off (unlinked)** removes the links from `positive` / `negative`, so the prompt boxes on the nodes they fed show their own typed text again. The node remembers where those links went.
+- **On (linked)** reconnects them to the same inputs.
+
+The toggle's position and the remembered links are saved with the workflow. (Bypassing the node doesn't do this: a bypassed node keeps its links, so the prompt boxes stay hidden.)
+
 **Extract Prompts (Metadata)** — takes a `source_metadata` link (e.g. from **Read Image Metadata (Path)** fed by a batch loader) and outputs `positive` / `negative`.
 
 ## What it can read

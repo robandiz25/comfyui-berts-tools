@@ -34,4 +34,7 @@ _merge("Prompt Extract", ".prompt_extract")
 
 print(f"[Bert's Tools] Loaded {len(NODE_CLASS_MAPPINGS)} nodes")
 
-__all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]
+# Frontend extensions (e.g. the "link prompts" toggle on Load Image (Extract Prompts))
+WEB_DIRECTORY = "./js"
+
+__all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY"]
