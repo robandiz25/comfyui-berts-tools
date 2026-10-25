@@ -39,15 +39,151 @@ _STRING_KEYS = (
 )
 _CONCAT_HINTS = ("concat", "join", "combine", "append")
 
+# LLM / prompt-enhancer nodes. Their OUTPUT (the expanded prompt) is never saved in the
+# API graph, only their inputs (instruction template + your text), so they need special
+# handling or the extractor returns the system prompt.
+_GENERATOR_HINTS = (
+    "generate", "llm", "enhance", "expand", "ollama", "gemini", "openai", "gpt",
+    "lmstudio", "chat", "florence", "joycaption", "vlm", "rewrite", "promptgen",
+)
+_SYSTEM_KEYS = (
+    "system_prompt", "system", "system_message", "instruction", "instructions",
+    "template", "prefix",
+)
+_USER_KEYS = (
+    "user_prompt", "user_input", "user_text", "prompt", "text", "input", "string",
+    "caption", "query", "question",
+)
+# Display nodes whose saved widget holds the text an LLM node produced.
+_DISPLAY_HINTS = ("show", "preview", "display", "debug", "view")
+
+# "User's Input:" style markers that end an instruction template.
+_USER_MARKER_RE = re.compile(
+    r"^\s*(?:\*\*)?(?:the\s+)?user(?:'s|s)?\s+(?:input|prompt|request|caption|text)"
+    r"(?:\*\*)?\s*:\s*(?:\*\*)?\s*",
+    re.IGNORECASE | re.MULTILINE,
+)
+# Phrases that only show up in instruction templates, never in a real image prompt.
+_TEMPLATE_HINT_RE = re.compile(
+    r"(you are an? (?:expert|helpful|professional)|expand the user|"
+    r"prompt engineer|follow these rules|output a single)",
+    re.IGNORECASE,
+)
+
 
 def _is_link(v):
     return isinstance(v, list) and len(v) == 2 and isinstance(v[0], (str, int))
 
 
+def _strip_template(text):
+    """If text is an LLM instruction template with the user's prompt appended, return
+    just the user's prompt. Anything else comes back unchanged."""
+    if not text:
+        return text
+    marks = list(_USER_MARKER_RE.finditer(text))
+    if marks:
+        tail = text[marks[-1].end():].strip()
+        if tail:
+            return tail
+    return text
+
+
+def _looks_like_template(text):
+    return bool(text) and bool(_TEMPLATE_HINT_RE.search(text) or _USER_MARKER_RE.search(text))
+
+
+def _is_generator(node):
+    cls = node.get("class_type", "").lower()
+    if any(h in cls for h in _GENERATOR_HINTS):
+        return True
+    inputs = node.get("inputs", {})
+    return any(k in inputs for k in _SYSTEM_KEYS) and any(k in inputs for k in _USER_KEYS)
+
+
+# --------------------------------------------------------------------------- workflow chunk
+
+def _flatten_strings(v):
+    if isinstance(v, str):
+        return [v]
+    if isinstance(v, (list, tuple)):
+        out = []
+        for x in v:
+            out.extend(_flatten_strings(x))
+        return out
+    if isinstance(v, dict):
+        out = []
+        for x in v.values():
+            out.extend(_flatten_strings(x))
+        return out
+    return []
+
+
+def _workflow_index(workflow):
+    """(nodes_by_id, out_links) across the main graph and any subgraphs.
+    out_links maps origin node id -> list of target node ids."""
+    nodes, out_links = {}, {}
+    if not isinstance(workflow, dict):
+        return nodes, out_links
+
+    def add_graph(g):
+        for n in g.get("nodes", []) or []:
+            if isinstance(n, dict) and "id" in n:
+                nodes.setdefault(str(n["id"]), n)
+        for l in g.get("links", []) or []:
+            if isinstance(l, list) and len(l) >= 4:
+                src, dst = l[1], l[3]
+            elif isinstance(l, dict):
+                src, dst = l.get("origin_id"), l.get("target_id")
+            else:
+                continue
+            out_links.setdefault(str(src), []).append(str(dst))
+
+    add_graph(workflow)
+    for sg in (workflow.get("definitions", {}) or {}).get("subgraphs", []) or []:
+        if isinstance(sg, dict):
+            add_graph(sg)
+    return nodes, out_links
+
+
+def _generated_text(ctx, nid):
+    """Text an LLM node produced, if a Show Text / Preview node saved it in the workflow."""
+    nodes, out_links = ctx.get("wf_index", ({}, {}))
+    key = nid.split(":")[-1]  # subgraph ids look like "5:12"
+    best = ""
+    for dst in out_links.get(key, []):
+        node = nodes.get(dst)
+        if not node:
+            continue
+        ntype = str(node.get("type", "")).lower()
+        if not any(h in ntype for h in _DISPLAY_HINTS):
+            continue
+        for s in _flatten_strings(node.get("widgets_values")):
+            if len(s.strip()) > len(best) and not _looks_like_template(s):
+                best = s.strip()
+    return best
+
+
 # --------------------------------------------------------------------------- ComfyUI graph
 
-def _resolve_string(graph, value, seen):
+def _resolve_generator(graph, nid, node, seen, ctx):
+    """Best text for an LLM node: its saved output if any, else the user's own input."""
+    out = _generated_text(ctx, nid)
+    if out:
+        ctx["note"] = "llm output"
+        return out
+    inputs = node.get("inputs", {})
+    for key in _USER_KEYS:
+        if key in inputs and key not in _SYSTEM_KEYS:
+            s = _resolve_string(graph, inputs[key], seen, ctx)
+            if s and s.strip():
+                ctx["note"] = "llm input"
+                return _strip_template(s).strip()
+    return ""
+
+
+def _resolve_string(graph, value, seen, ctx=None):
     """Turn an input value (literal or link) into a string, following string nodes."""
+    ctx = ctx if ctx is not None else {}
     if isinstance(value, str):
         return value
     if not _is_link(value):
@@ -60,14 +196,17 @@ def _resolve_string(graph, value, seen):
     inputs = node.get("inputs", {})
     cls = node.get("class_type", "").lower()
 
+    if _is_generator(node):
+        return _resolve_generator(graph, nid, node, seen, ctx)
+
     # Impact wildcard encoders: "populated_text" is the actual text used.
     if inputs.get("populated_text"):
-        return _resolve_string(graph, inputs["populated_text"], seen)
+        return _resolve_string(graph, inputs["populated_text"], seen, ctx)
 
     parts = []
     for key in _STRING_KEYS:
         if key in inputs:
-            s = _resolve_string(graph, inputs[key], seen)
+            s = _resolve_string(graph, inputs[key], seen, ctx)
             if s:
                 parts.append(s)
                 if not any(h in cls for h in _CONCAT_HINTS):
@@ -79,8 +218,9 @@ def _resolve_string(graph, value, seen):
     return parts[0] if parts else ""
 
 
-def _texts_from_conditioning(graph, link, seen=frozenset()):
+def _texts_from_conditioning(graph, link, seen=frozenset(), ctx=None):
     """Walk a CONDITIONING link upstream and collect the prompt text that fed it."""
+    ctx = ctx if ctx is not None else {}
     if not _is_link(link):
         return []
     nid = str(link[0])
@@ -98,7 +238,7 @@ def _texts_from_conditioning(graph, link, seen=frozenset()):
     found = []
     for key in _TEXT_KEYS:
         if key in inputs and key != "positive":
-            s = _resolve_string(graph, inputs[key], seen)
+            s = _resolve_string(graph, inputs[key], seen, ctx)
             if s and s.strip() and s.strip() not in found:
                 found.append(s.strip())
     if found:
@@ -109,7 +249,7 @@ def _texts_from_conditioning(graph, link, seen=frozenset()):
     out = []
     for key, val in inputs.items():
         if _is_link(val):
-            for t in _texts_from_conditioning(graph, val, seen):
+            for t in _texts_from_conditioning(graph, val, seen, ctx):
                 if t not in out:
                     out.append(t)
     return out
@@ -142,20 +282,32 @@ def _sampler_candidates(graph):
     return out
 
 
-def parse_comfy_prompt(prompt_json):
+def _load_json(v):
     try:
-        graph = json.loads(prompt_json) if isinstance(prompt_json, str) else prompt_json
+        return json.loads(v) if isinstance(v, str) else v
     except Exception:
         return None
+
+
+def parse_comfy_prompt(prompt_json, workflow_json=None):
+    """Return (positive, negative, note) or None. note is "" or "llm output"/"llm input"."""
+    graph = _load_json(prompt_json)
     if not isinstance(graph, dict):
         return None
     graph = {str(k): v for k, v in graph.items() if isinstance(v, dict)}
+    ctx = {"wf_index": _workflow_index(_load_json(workflow_json))}
 
     for pos_link, neg_link in _sampler_candidates(graph):
-        pos = _texts_from_conditioning(graph, pos_link)
+        pos = _texts_from_conditioning(graph, pos_link, ctx=ctx)
         if pos:
-            neg = _texts_from_conditioning(graph, neg_link) if neg_link else []
-            return "\n".join(pos), "\n".join(neg)
+            neg = _texts_from_conditioning(graph, neg_link, ctx=ctx) if neg_link else []
+            pos_s, neg_s = "\n".join(pos), "\n".join(neg)
+            # Safety net for enhancer nodes we didn't recognise by name.
+            if _looks_like_template(pos_s):
+                stripped = _strip_template(pos_s)
+                if stripped != pos_s:
+                    pos_s, ctx["note"] = stripped, "llm input"
+            return pos_s, neg_s, ctx.get("note", "")
     return None
 
 
@@ -183,9 +335,10 @@ def extract_prompts(meta):
     text = (meta or {}).get("text", {}) or {}
 
     if "prompt" in text:
-        r = parse_comfy_prompt(text["prompt"])
+        r = parse_comfy_prompt(text["prompt"], text.get("workflow"))
         if r:
-            return r[0], r[1], "comfyui"
+            src = "comfyui" + (f" ({r[2]})" if r[2] else "")
+            return r[0], r[1], src
     if "parameters" in text:
         r = parse_a1111_parameters(text["parameters"])
         if r:
