@@ -5,6 +5,8 @@ Drop an image in, get its positive and negative prompts out as STRINGs.
 
 Nodes:
   * Load Image (Extract Prompts)   - Load Image + positive/negative prompt outputs
+  * Load Image (Extract Prompts + Preview) - same, plus read-only text boxes on the node
+                                     showing the prompts (fill in on image pick)
   * Extract Prompts (Metadata)     - same parsing, from a source_metadata link
                                      (pair with Read Image Metadata (Path) for batch loaders)
 
@@ -19,6 +21,7 @@ UserComment and ComfyUI WebP EXIF tags all work. No extra pip installs.
 """
 
 import json
+import os
 import re
 
 from ..source_metadata import META_TYPE, LoadImageWithMetadata
@@ -376,11 +379,14 @@ class LoadImageExtractPrompts(LoadImageWithMetadata):
     FUNCTION = "load_prompts"
     CATEGORY = CATEGORY
 
-    def load_prompts(self, image):
+    def _load_and_extract(self, image):
         img, mask, meta, name, _name_ext, path = self.load(image)
         pos, neg, source = extract_prompts(meta)
         _log(source, path, pos, neg)
-        return (img, mask, pos, neg, meta, name)
+        return (img, mask, pos, neg, meta, name), source
+
+    def load_prompts(self, image):
+        return self._load_and_extract(image)[0]
 
 
 class ExtractPromptsFromMetadata:
@@ -401,12 +407,81 @@ class ExtractPromptsFromMetadata:
         return (pos, neg)
 
 
+class LoadImageExtractPromptsPreview(LoadImageExtractPrompts):
+    """Load Image (Extract Prompts) that also shows the prompts as text on the node.
+
+    The text boxes fill in as soon as an image is picked or uploaded (via the
+    /berts/extract_prompts route), and are refreshed again whenever the node runs.
+    """
+
+    def load_prompts(self, image):
+        result, source = self._load_and_extract(image)
+        pos, neg = result[2], result[3]
+        return {
+            "ui": {"berts_prompts": [{"positive": pos, "negative": neg, "source": source}]},
+            "result": result,
+        }
+
+
+# --------------------------------------------------------------------------- preview route
+
+def _allowed_roots():
+    import folder_paths
+    roots = []
+    for getter in ("get_input_directory", "get_output_directory", "get_temp_directory"):
+        try:
+            roots.append(os.path.realpath(getattr(folder_paths, getter)()))
+        except Exception:
+            pass
+    return roots
+
+
+def preview_prompts_for(image_name):
+    """(positive, negative, source) for an image name as the Load Image widget stores it,
+    e.g. 'foo.png', 'sub/foo.png' or 'foo.png [output]'. Only reads ComfyUI's
+    input / output / temp folders."""
+    import folder_paths
+    from ..source_metadata import read_source_metadata
+
+    path = os.path.realpath(folder_paths.get_annotated_filepath(image_name))
+    if not any(os.path.commonpath([path, r]) == r for r in _allowed_roots()):
+        raise PermissionError("path outside ComfyUI folders")
+    if not os.path.isfile(path):
+        raise FileNotFoundError(image_name)
+    meta = {"text": read_source_metadata(path), "source": path}
+    return extract_prompts(meta)
+
+
+try:
+    from aiohttp import web
+    from server import PromptServer
+
+    @PromptServer.instance.routes.get("/berts/extract_prompts")
+    async def _berts_extract_prompts(request):
+        name = request.rel_url.query.get("image", "")
+        if not name:
+            return web.json_response({"error": "missing image"}, status=400)
+        try:
+            pos, neg, source = preview_prompts_for(name)
+        except FileNotFoundError:
+            return web.json_response({"error": "not found"}, status=404)
+        except PermissionError:
+            return web.json_response({"error": "forbidden"}, status=403)
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=500)
+        return web.json_response({"positive": pos, "negative": neg, "source": source})
+except Exception as e:  # e.g. imported outside a running ComfyUI
+    print(f"[PromptExtract] Preview route not registered: {e}")
+
+
 NODE_CLASS_MAPPINGS = {
     "BertsLoadImageExtractPrompts": LoadImageExtractPrompts,
+    "BertsLoadImageExtractPromptsPreview": LoadImageExtractPromptsPreview,
     "BertsExtractPromptsFromMetadata": ExtractPromptsFromMetadata,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "BertsLoadImageExtractPrompts": "Load Image (Extract Prompts)",
+    "BertsLoadImageExtractPromptsPreview": "Load Image (Extract Prompts + Preview)",
     "BertsExtractPromptsFromMetadata": "Extract Prompts (Metadata)",
 }

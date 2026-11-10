@@ -6,6 +6,7 @@ Bert's Tools - a small pack of ComfyUI custom nodes by robandiz25.
   * Read Image Metadata (Path)     (image/metadata)
   * Save Image (Source Metadata)   (image/metadata)
   * Load Image (Extract Prompts)   (image/metadata)
+  * Load Image (Extract Prompts + Preview) (image/metadata)
   * Extract Prompts (Metadata)     (image/metadata)
 
 Node IDs are unchanged from the original standalone repos, so existing

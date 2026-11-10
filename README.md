@@ -9,6 +9,7 @@ A small pack of ComfyUI custom nodes.
 | **Read Image Metadata (Path)** | `image/metadata` | Reads generation metadata from any file path (for batch / folder loaders). |
 | **Save Image (Source Metadata)** | `image/metadata` | Saves PNGs that carry the *source* image's metadata, so detailed/upscaled results still load the original workflow. |
 | **Load Image (Extract Prompts)** | `image/metadata` | Drop an image in, get its positive and negative prompts out as strings. |
+| **Load Image (Extract Prompts + Preview)** | `image/metadata` | Same as above, and shows the prompts as text right on the node. |
 | **Extract Prompts (Metadata)** | `image/metadata` | Same, from a `source_metadata` link (for batch / folder loaders). |
 
 Full docs for each node:

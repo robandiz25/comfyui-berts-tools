@@ -23,6 +23,15 @@ The node has a **link prompts** toggle:
 
 The toggle's position and the remembered links are saved with the workflow. (Bypassing the node doesn't do this: a bypassed node keeps its links, so the prompt boxes stay hidden.)
 
+**Load Image (Extract Prompts + Preview)** — the same node (same outputs, same **link prompts** toggle) with two read-only text boxes on it showing the positive and negative prompts.
+
+- The boxes fill in **as soon as you pick or upload an image** — no need to queue the workflow first.
+- When the node runs, they're refreshed with the exact strings it output.
+- Hover a box to see where the prompt came from (`comfyui`, `comfyui (llm output)`, `a1111`, …). If nothing was found, the box says so.
+- You can select and copy text out of them. They're display-only: not saved with the workflow and not sent to the backend.
+
+The original **Load Image (Extract Prompts)** is unchanged, so existing workflows keep working.
+
 **Extract Prompts (Metadata)** — takes a `source_metadata` link (e.g. from **Read Image Metadata (Path)** fed by a batch loader) and outputs `positive` / `negative`.
 
 ## What it can read

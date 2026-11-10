@@ -1,4 +1,5 @@
-// Bert's Tools - "link prompts" toggle for Load Image (Extract Prompts).
+// Bert's Tools - "link prompts" toggle for Load Image (Extract Prompts) and
+// Load Image (Extract Prompts + Preview).
 //
 // Off: remembers where the positive/negative outputs were wired, then removes those
 //      links, so the downstream prompt boxes show their own text again.
@@ -9,7 +10,7 @@
 
 import { app } from "../../scripts/app.js";
 
-const NODE_TYPE = "BertsLoadImageExtractPrompts";
+const NODE_TYPES = ["BertsLoadImageExtractPrompts", "BertsLoadImageExtractPromptsPreview"];
 const PROMPT_OUTPUTS = ["positive", "negative"];
 const PROP_ON = "berts_link_prompts";
 const PROP_SAVED = "berts_saved_prompt_links";
@@ -79,7 +80,7 @@ app.registerExtension({
     name: "berts_tools.prompt_link_toggle",
 
     async beforeRegisterNodeDef(nodeType, nodeData) {
-        if (nodeData.name !== NODE_TYPE) return;
+        if (!NODE_TYPES.includes(nodeData.name)) return;
 
         const onNodeCreated = nodeType.prototype.onNodeCreated;
         nodeType.prototype.onNodeCreated = function () {
