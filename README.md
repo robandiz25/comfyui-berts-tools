@@ -11,12 +11,14 @@ A small pack of ComfyUI custom nodes.
 | **Load Image (Extract Prompts)** | `image/metadata` | Drop an image in, get its positive and negative prompts out as strings. |
 | **Load Image (Extract Prompts + Preview)** | `image/metadata` | Same as above, and shows the prompts as text right on the node. |
 | **Extract Prompts (Metadata)** | `image/metadata` | Same, from a `source_metadata` link (for batch / folder loaders). |
+| **Unlinker** | `utils` | Pass-through with a Link/Unlink button: unlink to type into a prompt box by hand, link to feed it from another node again. |
 
 Full docs for each node:
 
 - [Aspect Ratio Passthrough](aspect_ratio_passthrough/README.md)
 - [Source Metadata](source_metadata/README.md)
 - [Prompt Extract](prompt_extract/README.md)
+- [Unlinker](unlinker/README.md)
 
 ## Installation
 

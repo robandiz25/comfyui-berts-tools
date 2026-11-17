@@ -1,7 +1,7 @@
 [project]
 name = "comfyui-berts-tools"
-description = "Bert's Tools: Aspect Ratio Passthrough plus Source Metadata load/save and Prompt Extract nodes for ComfyUI."
-version = "1.3.0"
+description = "Bert's Tools: Aspect Ratio Passthrough plus Source Metadata load/save, Prompt Extract and Unlinker nodes for ComfyUI."
+version = "1.4.0"
 license = { file = "LICENSE" }
 dependencies = []
 

@@ -8,6 +8,7 @@ Bert's Tools - a small pack of ComfyUI custom nodes by robandiz25.
   * Load Image (Extract Prompts)   (image/metadata)
   * Load Image (Extract Prompts + Preview) (image/metadata)
   * Extract Prompts (Metadata)     (image/metadata)
+  * Unlinker                       (utils)
 
 Node IDs are unchanged from the original standalone repos, so existing
 workflows keep working. Uninstall the old standalone packs first to avoid
@@ -32,10 +33,12 @@ def _merge(name, module_path):
 _merge("Aspect Ratio Passthrough", ".aspect_ratio_passthrough")
 _merge("Source Metadata", ".source_metadata")
 _merge("Prompt Extract", ".prompt_extract")
+_merge("Unlinker", ".unlinker")
 
 print(f"[Bert's Tools] Loaded {len(NODE_CLASS_MAPPINGS)} nodes")
 
-# Frontend extensions (e.g. the "link prompts" toggle on Load Image (Extract Prompts))
+# Frontend extensions (the "link prompts" toggle on Load Image (Extract Prompts),
+# and the Link/Unlink button on Unlinker)
 WEB_DIRECTORY = "./js"
 
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY"]
